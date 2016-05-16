@@ -91,5 +91,14 @@
         "AuthEndpoint": "",
         "TokenEndpoint": "",
         "UserApiEndpoint": ""
+    },
+    "EngineSettings": {
+        "Enable": true,
+        "Secret": "",
+        "Id": "",
+        "Scope": "openid",
+        "AuthEndpoint": "https://sso.datasciencegroup.pl/oauth/authorize",
+        "TokenEndpoint": "https://sso.datasciencegroup.pl/oauth/token",
+        "UserApiEndpoint": "https://sso.datasciencegroup.pl/user"
     }
 }

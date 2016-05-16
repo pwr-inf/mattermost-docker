@@ -16,7 +16,11 @@ RUN mkdir /go
 ENV GOPATH=/go
 ENV GO15VENDOREXPERIMENT=0
 RUN cd /go && mkdir -p src/github.com/mattermost
-RUN cd /go/src/github.com/mattermost && git clone https://github.com/mattermost/platform.git 
+
+
+RUN echo "chau2sss2jziew" && cd /go/src/github.com/mattermost && git clone https://github.com/pwr-inf/platform.git
+
+# https://github.com/mattermost/platform.git 
 RUN cd /go/src/github.com/mattermost/platform && make package
 RUN mv /go/src/github.com/mattermost/platform/dist/mattermost/* /mattermost/
 COPY config.template.json /
