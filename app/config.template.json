@@ -10,7 +10,9 @@
         "EnablePostUsernameOverride": false,
         "EnablePostIconOverride": false,
         "EnableTesting": false,
-        "EnableSecurityFixAlert": true
+        "EnableSecurityFixAlert": true,
+        "EnableInsecureOutgoingConnections": true,
+        "DisableEmailSignUp": true,
     },
     "TeamSettings": {
         "SiteName": "Mattermost",
@@ -31,9 +33,9 @@
         "AtRestEncryptKey": "7rAh6iwQCkV4cA1Gsg3fgGOXJAQ43QVg"
     },
     "LogSettings": {
-        "EnableConsole": false,
-        "ConsoleLevel": "INFO",
-        "EnableFile": true,
+        "EnableConsole": true,
+        "ConsoleLevel": "DEBUG",
+        "EnableFile": false,
         "FileLevel": "INFO",
         "FileFormat": "",
         "FileLocation": ""
@@ -94,8 +96,8 @@
     },
     "EngineSettings": {
         "Enable": true,
-        "Secret": "",
-        "Id": "",
+        "Secret": "thesecret",
+        "Id": "matternmost",
         "Scope": "openid",
         "AuthEndpoint": "https://sso.datasciencegroup.pl/oauth/authorize",
         "TokenEndpoint": "https://sso.datasciencegroup.pl/oauth/token",
