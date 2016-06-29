@@ -12,7 +12,7 @@
         "EnableTesting": false,
         "EnableSecurityFixAlert": true,
         "EnableInsecureOutgoingConnections": true,
-        "DisableEmailSignUp": true,
+        "DisableEmailSignUp": true
     },
     "TeamSettings": {
         "SiteName": "Mattermost",
@@ -58,7 +58,9 @@
         "AmazonS3Region": ""
     },
     "EmailSettings": {
-        "EnableSignUpWithEmail": true,
+        "EnableSignUpWithEmail": false,
+        "EnableSignInWithEmail": false,
+        "EnableSignInWithUsername": false,
         "SendEmailNotifications": false,
         "RequireEmailVerification": false,
         "FeedbackName": "",
