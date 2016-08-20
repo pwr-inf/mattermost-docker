@@ -99,7 +99,7 @@
     "EngineSettings": {
         "Enable": true,
         "Secret": "thesecret",
-        "Id": "matternmost",
+        "Id": "matternmost2",
         "Scope": "openid",
         "AuthEndpoint": "https://sso.datasciencegroup.pl/oauth/authorize",
         "TokenEndpoint": "https://sso.datasciencegroup.pl/oauth/token",

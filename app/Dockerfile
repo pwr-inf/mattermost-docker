@@ -18,7 +18,11 @@ ENV GO15VENDOREXPERIMENT=0
 RUN cd /go && mkdir -p src/github.com/mattermost
 
 
-RUN cd /go/src/github.com/mattermost && git clone https://github.com/pwr-inf/platform.git
+RUN cd /go/src/github.com/mattermost && git clone https://github.com/mattermost/platform.git && cd platform && git checkout origin/release-3.3
+COPY engine_oauth.diff /go/src/github.com/mattermost/platform/engine_oauth.diff
+COPY engine.png /go/src/github.com/mattermost/platform/webapp/images/icons/engine.png
+
+RUN cd /go/src/github.com/mattermost/platform && patch -p1 < engine_oauth.diff
 
 # https://github.com/mattermost/platform.git 
 RUN cd /go/src/github.com/mattermost/platform && make package

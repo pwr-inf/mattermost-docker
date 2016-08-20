@@ -1,0 +1,871 @@
+diff --git a/api/oauth.go b/api/oauth.go
+index e2ea001..b581bc4 100644
+--- a/api/oauth.go
++++ b/api/oauth.go
+@@ -421,7 +421,7 @@ func getAccessToken(c *Context, w http.ResponseWriter, r *http.Request) {
+ 	r.ParseForm()
+ 
+ 	code := r.FormValue("code")
+-	refreshToken := r.FormValue("refresh_token")
++//	refreshToken := r.FormValue("refresh_token")
+ 
+ 	grantType := r.FormValue("grant_type")
+ 	switch grantType {
+@@ -430,11 +430,11 @@ func getAccessToken(c *Context, w http.ResponseWriter, r *http.Request) {
+ 			c.Err = model.NewLocAppError("getAccessToken", "api.oauth.get_access_token.missing_code.app_error", nil, "")
+ 			return
+ 		}
+-	case model.REFRESH_TOKEN_GRANT_TYPE:
++/*	case model.REFRESH_TOKEN_GRANT_TYPE:
+ 		if len(refreshToken) == 0 {
+ 			c.Err = model.NewLocAppError("getAccessToken", "api.oauth.get_access_token.missing_refresh_token.app_error", nil, "")
+ 			return
+-		}
++		}*/
+ 	default:
+ 		c.Err = model.NewLocAppError("getAccessToken", "api.oauth.get_access_token.bad_grant.app_error", nil, "")
+ 		return
+@@ -538,7 +538,8 @@ func getAccessToken(c *Context, w http.ResponseWriter, r *http.Request) {
+ 				session = result
+ 			}
+ 
+-			accessData = &model.AccessData{ClientId: clientId, UserId: user.Id, Token: session.Token, RefreshToken: model.NewId(), RedirectUri: redirectUri, ExpiresAt: session.ExpiresAt}
++//			accessData = &model.AccessData{ClientId: clientId, UserId: user.Id, Token: session.Token, RefreshToken: model.NewId(), RedirectUri: redirectUri, ExpiresAt: session.ExpiresAt}
++			accessData = &model.AccessData{ClientId: clientId, UserId: user.Id, Token: session.Token, RedirectUri: redirectUri, ExpiresAt: session.ExpiresAt}
+ 
+ 			if result := <-Srv.Store.OAuth().SaveAccessData(accessData); result.Err != nil {
+ 				l4g.Error(result.Err)
+@@ -549,15 +550,15 @@ func getAccessToken(c *Context, w http.ResponseWriter, r *http.Request) {
+ 			accessRsp = &model.AccessResponse{
+ 				AccessToken:  session.Token,
+ 				TokenType:    model.ACCESS_TOKEN_TYPE,
+-				RefreshToken: accessData.RefreshToken,
++//				RefreshToken: accessData.RefreshToken,
+ 				ExpiresIn:    int32(*utils.Cfg.ServiceSettings.SessionLengthSSOInDays * 60 * 60 * 24),
+ 			}
+ 		}
+ 
+ 		<-Srv.Store.OAuth().RemoveAuthData(authData.Code)
+-	} else {
++	} /*else {
+ 		// when grantType is refresh_token
+-		if result := <-Srv.Store.OAuth().GetAccessDataByRefreshToken(refreshToken); result.Err != nil {
++		if result := <-Srv.Store.OAuth().GetAccessDataByRefreshToken(); result.Err != nil {
+ 			c.LogAudit("fail - refresh token is invalid")
+ 			c.Err = model.NewLocAppError("getAccessToken", "api.oauth.get_access_token.refresh_token.app_error", nil, "")
+ 			return
+@@ -579,7 +580,7 @@ func getAccessToken(c *Context, w http.ResponseWriter, r *http.Request) {
+ 		} else {
+ 			accessRsp = access
+ 		}
+-	}
++	}*/
+ 
+ 	w.Header().Set("Content-Type", "application/json")
+ 	w.Header().Set("Cache-Control", "no-store")
+@@ -745,6 +746,7 @@ func AuthorizeOAuthUser(service, code, state, redirectUri string) (io.ReadCloser
+ 
+ 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+ 	req.Header.Set("Accept", "application/json")
++	req.SetBasicAuth(sso.Id, sso.Secret)
+ 
+ 	var ar *model.AccessResponse
+ 	if resp, err := client.Do(req); err != nil {
+diff --git a/config/config.json b/config/config.json
+index 9b9bcb6..0d1ccda 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -140,6 +140,16 @@
+         "TokenEndpoint": "",
+         "UserApiEndpoint": ""
+     },
++    "EngineSettings": {
++        "Enable": true,
++        "Secret": "enginetest",
++        "Id": "mattermost",
++        "Scope": "openid",
++        "AuthEndpoint": "http://sso.datasciencegroup.pl/oauth/authorize",
++        "TokenEndpoint": "http://sso.datasciencegroup.pl/oauth/token",
++        "UserApiEndpoint": "http://sso.datasciencegroup.pl/user"
++    },
++
+     "GoogleSettings": {
+         "Enable": false,
+         "Secret": "",
+diff --git a/mattermost.go b/mattermost.go
+index 1f0325b..73d280e 100644
+--- a/mattermost.go
++++ b/mattermost.go
+@@ -31,6 +31,7 @@ import (
+ 
+ 	// Plugins
+ 	_ "github.com/mattermost/platform/model/gitlab"
++	_ "github.com/mattermost/platform/model/engine"
+ 
+ 	// Enterprise Deps
+ 	_ "github.com/dgryski/dgoogauth"
+diff --git a/model/access.go b/model/access.go
+index 85417fc..3e79156 100644
+--- a/model/access.go
++++ b/model/access.go
+@@ -18,7 +18,7 @@ type AccessData struct {
+ 	ClientId     string `json:"client_id"`
+ 	UserId       string `json:"user_id"`
+ 	Token        string `json:"token"`
+-	RefreshToken string `json:"refresh_token"`
++//	RefreshToken string `json:"refresh_token"`
+ 	RedirectUri  string `json:"redirect_uri"`
+ 	ExpiresAt    int64  `json:"expires_at"`
+ }
+@@ -28,7 +28,7 @@ type AccessResponse struct {
+ 	TokenType    string `json:"token_type"`
+ 	ExpiresIn    int32  `json:"expires_in"`
+ 	Scope        string `json:"scope"`
+-	RefreshToken string `json:"refresh_token"`
++//	RefreshToken string `json:"refresh_token"`
+ }
+ 
+ // IsValid validates the AccessData and returns an error if it isn't configured
+@@ -47,9 +47,9 @@ func (ad *AccessData) IsValid() *AppError {
+ 		return NewLocAppError("AccessData.IsValid", "model.access.is_valid.access_token.app_error", nil, "")
+ 	}
+ 
+-	if len(ad.RefreshToken) > 26 {
+-		return NewLocAppError("AccessData.IsValid", "model.access.is_valid.refresh_token.app_error", nil, "")
+-	}
++//	if len(ad.RefreshToken) > 26 {
++//		return NewLocAppError("AccessData.IsValid", "model.access.is_valid.refresh_token.app_error", nil, "")
++//	}
+ 
+ 	if len(ad.RedirectUri) > 256 {
+ 		return NewLocAppError("AccessData.IsValid", "model.access.is_valid.redirect_uri.app_error", nil, "")
+diff --git a/model/config.go b/model/config.go
+index 7fe575e..a2901f8 100644
+--- a/model/config.go
++++ b/model/config.go
+@@ -25,6 +25,7 @@ const (
+ 
+ 	SERVICE_GITLAB    = "gitlab"
+ 	SERVICE_GOOGLE    = "google"
++	SERVICE_ENGINE    = "engine"
+ 	SERVICE_OFFICE365 = "office365"
+ 
+ 	WEBSERVER_MODE_REGULAR  = "regular"
+@@ -296,6 +297,7 @@ type Config struct {
+ 	PrivacySettings      PrivacySettings
+ 	SupportSettings      SupportSettings
+ 	GitLabSettings       SSOSettings
++	EngineSettings       SSOSettings
+ 	GoogleSettings       SSOSettings
+ 	Office365Settings    SSOSettings
+ 	LdapSettings         LdapSettings
+@@ -323,6 +325,8 @@ func (o *Config) GetSSOService(service string) *SSOSettings {
+ 		return &o.GoogleSettings
+ 	case SERVICE_OFFICE365:
+ 		return &o.Office365Settings
++	case SERVICE_ENGINE:
++		return &o.EngineSettings
+ 	}
+ 
+ 	return nil
+diff --git a/model/engine/engine.go b/model/engine/engine.go
+new file mode 100644
+index 0000000..21bc2f6
+--- /dev/null
++++ b/model/engine/engine.go
+@@ -0,0 +1,136 @@
++// Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
++// See License.txt for license information.
++
++package oauthengine
++
++import (
++	"bytes"
++	"encoding/json"
++	"github.com/mattermost/platform/einterfaces"
++	"github.com/mattermost/platform/model"
++	"io"
++)
++
++const (
++	USER_AUTH_SERVICE_ENGINE = "engine"
++)
++
++type EngineProvider struct {
++}
++
++type EngineUser struct {
++	Id       string
++	Username string
++	Email    string
++	Name     string
++	Surname  string
++	IsAdmin  bool
++}
++
++func StreamToByte(stream io.Reader) []byte {
++	buf := new(bytes.Buffer)
++	buf.ReadFrom(stream)
++	return buf.Bytes()
++}
++
++func stringInSlice(a string, list []interface{}) bool {
++    for _, b := range list {
++        if b.(string) == a {
++            return true
++        }
++    }
++    return false
++}
++
++
++func init() {
++	provider := &EngineProvider{}
++	einterfaces.RegisterOauthProvider(USER_AUTH_SERVICE_ENGINE, provider)
++}
++
++func userFromEngineUser(glu *EngineUser) *model.User {
++	user := &model.User{}
++	username := glu.Username
++	if username == "" {
++		username = glu.Username
++	}
++
++	user.Username  = model.CleanUsername(username)
++	user.FirstName = glu.Name
++	user.LastName  = glu.Surname
++	user.Email = glu.Email
++	user.AuthData = &glu.Id
++	user.AuthService = USER_AUTH_SERVICE_ENGINE
++
++	if glu.IsAdmin {
++		user.Roles = model.ROLE_SYSTEM_ADMIN
++	}
++
++	return user
++}
++
++func engineUserFromJson(data io.Reader) *EngineUser {
++	user := &EngineUser{}
++
++	var j map[string]interface{}
++	err := json.Unmarshal(StreamToByte(data), &j)
++	if err != nil {
++		return nil
++	}
++
++	principal := j["principal"].(map[string]interface{})
++	user.Id = string(int(principal["id"].(float64)))
++	user.Username = principal["username"].(string)
++	user.Email = principal["email"].(string)
++	user.Name = principal["name"].(string)
++	user.Surname = principal["surname"].(string)
++	user.IsAdmin = false
++
++	roles := principal["userAuthorities"].([]interface {})
++	
++	if len(roles) > 0 {
++		user.IsAdmin = stringInSlice("ROLE_ADMIN", roles)
++	}
++
++
++	return user
++}
++
++func (glu *EngineUser) IsValid() bool {
++//	if strconv.Atoi(glu.Id) == 0 {
++//		return false
++//	}
++
++	if len(glu.Email) == 0 {
++		return false
++	}
++
++	return true
++}
++
++func (glu *EngineUser) getAuthData() string {
++	return glu.Id
++}
++
++func (m *EngineProvider) GetIdentifier() string {
++	return USER_AUTH_SERVICE_ENGINE
++}
++
++func (m *EngineProvider) GetUserFromJson(data io.Reader) *model.User {
++	glu := engineUserFromJson(data)
++	if glu.IsValid() {
++		return userFromEngineUser(glu)
++	}
++
++	return &model.User{}
++}
++
++func (m *EngineProvider) GetAuthDataFromJson(data io.Reader) string {
++	glu := engineUserFromJson(data)
++
++	if glu.IsValid() {
++		return glu.getAuthData()
++	}
++
++	return ""
++}
+diff --git a/store/sql_oauth_store.go b/store/sql_oauth_store.go
+index 6db54bd..33957d2 100644
+--- a/store/sql_oauth_store.go
++++ b/store/sql_oauth_store.go
+@@ -39,7 +39,6 @@ func NewSqlOAuthStore(sqlStore *SqlStore) OAuthStore {
+ 		tableAccess.ColMap("ClientId").SetMaxSize(26)
+ 		tableAccess.ColMap("UserId").SetMaxSize(26)
+ 		tableAccess.ColMap("Token").SetMaxSize(26)
+-		tableAccess.ColMap("RefreshToken").SetMaxSize(26)
+ 		tableAccess.ColMap("RedirectUri").SetMaxSize(256)
+ 		tableAccess.SetUniqueTogether("ClientId", "UserId")
+ 	}
+@@ -65,7 +64,6 @@ func (as SqlOAuthStore) CreateIndexesIfNotExists() {
+ 	as.CreateIndexIfNotExists("idx_oauthapps_creator_id", "OAuthApps", "CreatorId")
+ 	as.CreateIndexIfNotExists("idx_oauthaccessdata_client_id", "OAuthAccessData", "ClientId")
+ 	as.CreateIndexIfNotExists("idx_oauthaccessdata_user_id", "OAuthAccessData", "UserId")
+-	as.CreateIndexIfNotExists("idx_oauthaccessdata_refresh_token", "OAuthAccessData", "RefreshToken")
+ 	as.CreateIndexIfNotExists("idx_oauthauthdata_client_id", "OAuthAuthData", "Code")
+ }
+ 
+@@ -294,29 +292,6 @@ func (as SqlOAuthStore) GetAccessData(token string) StoreChannel {
+ 	return storeChannel
+ }
+ 
+-func (as SqlOAuthStore) GetAccessDataByRefreshToken(token string) StoreChannel {
+-
+-	storeChannel := make(StoreChannel)
+-
+-	go func() {
+-		result := StoreResult{}
+-
+-		accessData := model.AccessData{}
+-
+-		if err := as.GetReplica().SelectOne(&accessData, "SELECT * FROM OAuthAccessData WHERE RefreshToken = :Token", map[string]interface{}{"Token": token}); err != nil {
+-			result.Err = model.NewLocAppError("SqlOAuthStore.GetAccessData", "store.sql_oauth.get_access_data.app_error", nil, err.Error())
+-		} else {
+-			result.Data = &accessData
+-		}
+-
+-		storeChannel <- result
+-		close(storeChannel)
+-
+-	}()
+-
+-	return storeChannel
+-}
+-
+ func (as SqlOAuthStore) GetPreviousAccessData(userId, clientId string) StoreChannel {
+ 
+ 	storeChannel := make(StoreChannel)
+diff --git a/store/store.go b/store/store.go
+index b9a55fa..b9546c4 100644
+--- a/store/store.go
++++ b/store/store.go
+@@ -196,7 +196,6 @@ type OAuthStore interface {
+ 	SaveAccessData(accessData *model.AccessData) StoreChannel
+ 	UpdateAccessData(accessData *model.AccessData) StoreChannel
+ 	GetAccessData(token string) StoreChannel
+-	GetAccessDataByRefreshToken(token string) StoreChannel
+ 	GetPreviousAccessData(userId, clientId string) StoreChannel
+ 	RemoveAccessData(token string) StoreChannel
+ }
+diff --git a/utils/config.go b/utils/config.go
+index a1a6bec..6b11c07 100644
+--- a/utils/config.go
++++ b/utils/config.go
+@@ -272,6 +272,7 @@ func getClientConfig(c *model.Config) map[string]string {
+ 	props["AppDownloadLink"] = *c.NativeAppSettings.AppDownloadLink
+ 	props["AndroidAppDownloadLink"] = *c.NativeAppSettings.AndroidAppDownloadLink
+ 	props["IosAppDownloadLink"] = *c.NativeAppSettings.IosAppDownloadLink
++	props["EnableSignUpWithEngine"] = strconv.FormatBool(c.EngineSettings.Enable)
+ 
+ 	if IsLicensed {
+ 		if *License.Features.CustomBrand {
+diff --git a/webapp/Makefile b/webapp/Makefile
+index 10712de..b80ca62 100644
+--- a/webapp/Makefile
++++ b/webapp/Makefile
+@@ -13,7 +13,8 @@ test: .npminstall
+ .npminstall: package.json
+ 	@echo Getting dependencies using npm
+ 
+-	npm install
++	npm install --only=dev
++	npm install --only=prod
+ 
+ 	touch $@
+ 
+diff --git a/webapp/components/admin_console/oauth_settings.jsx b/webapp/components/admin_console/oauth_settings.jsx
+index ad7d215..f556f80 100644
+--- a/webapp/components/admin_console/oauth_settings.jsx
++++ b/webapp/components/admin_console/oauth_settings.jsx
+@@ -22,11 +22,13 @@ export default class OAuthSettings extends AdminSettings {
+         this.renderOffice365 = this.renderOffice365.bind(this);
+         this.renderGoogle = this.renderGoogle.bind(this);
+         this.renderGitLab = this.renderGitLab.bind(this);
++        this.renderEngine = this.renderEngine.bind(this);
+         this.changeType = this.changeType.bind(this);
+     }
+ 
+     getConfigFromState(config) {
+         config.GitLabSettings.Enable = false;
++        config.EngineSettings.Enable = false;
+         config.GoogleSettings.Enable = false;
+         config.Office365Settings.Enable = false;
+ 
+@@ -39,6 +41,16 @@ export default class OAuthSettings extends AdminSettings {
+             config.GitLabSettings.TokenEndpoint = this.state.tokenEndpoint;
+         }
+ 
++        if (this.state.oauthType === Constants.ENGINE_SERVICE) {
++            config.EngineSettings.Enable = true;
++            config.EngineSettings.Id = this.state.id;
++            config.EngineSettings.Secret = this.state.secret;
++            config.EngineSettings.UserApiEndpoint = this.state.userApiEndpoint;
++            config.EngineSettings.AuthEndpoint = this.state.authEndpoint;
++            config.EngineSettings.TokenEndpoint = this.state.tokenEndpoint;
++            config.EngineSettings.Scope = this.state.scope;
++        }
++
+         if (this.state.oauthType === Constants.GOOGLE_SERVICE) {
+             config.GoogleSettings.Enable = true;
+             config.GoogleSettings.Id = this.state.id;
+@@ -70,6 +82,9 @@ export default class OAuthSettings extends AdminSettings {
+         if (config.GitLabSettings.Enable) {
+             oauthType = Constants.GITLAB_SERVICE;
+             settings = config.GitLabSettings;
++        } else if (config.EngineSettings.Enable) {
++            oauthType = Constants.ENGINE_SERVICE;
++            settings = config.EngineSettings;
+         } else if (config.GoogleSettings.Enable) {
+             oauthType = Constants.GOOGLE_SERVICE;
+             settings = config.GoogleSettings;
+@@ -92,6 +107,8 @@ export default class OAuthSettings extends AdminSettings {
+         let settings = {};
+         if (value === Constants.GITLAB_SERVICE) {
+             settings = this.config.GitLabSettings;
++        } else if (value === Constants.ENGINE_SERVICE) {
++            settings = this.config.EngineSettings;
+         } else if (value === Constants.GOOGLE_SERVICE) {
+             settings = this.config.GoogleSettings;
+         } else if (value === Constants.OFFICE365_SERVICE) {
+@@ -272,6 +289,103 @@ export default class OAuthSettings extends AdminSettings {
+         );
+     }
+ 
++    renderEngine() {
++        return (
++            <div>
++                <TextSetting
++                    id='id'
++                    label={
++                        <FormattedMessage
++                            id='admin.engine.clientIdTitle'
++                            defaultMessage='Application ID:'
++                        />
++                    }
++                    placeholder={Utils.localizeMessage('admin.engine.clientIdExample', 'Ex "jcuS8PuvcpGhpgHhlcpT1Mx42pnqMxQY"')}
++                    helpText={
++                        <FormattedMessage
++                            id='admin.gitlab.clientIdDescription'
++                            defaultMessage='Obtain this value via the instructions above for logging into Engine'
++                        />
++                    }
++                    value={this.state.id}
++                    onChange={this.handleChange}
++                />
++                <TextSetting
++                    id='secret'
++                    label={
++                        <FormattedMessage
++                            id='admin.engine.clientSecretTitle'
++                            defaultMessage='Application Secret Key:'
++                        />
++                    }
++                    placeholder={Utils.localizeMessage('admin.engine.clientSecretExample', 'Ex "jcuS8PuvcpGhpgHhlcpT1Mx42pnqMxQY"')}
++                    helpText={
++                        <FormattedMessage
++                            id='admin.engine.clientSecretDescription'
++                            defaultMessage='Obtain this value via the instructions above for logging into Engine.'
++                        />
++                    }
++                    value={this.state.secret}
++                    onChange={this.handleChange}
++                />
++                <TextSetting
++                    id='userApiEndpoint'
++                    label={
++                        <FormattedMessage
++                            id='admin.engine.userTitle'
++                            defaultMessage='User API Endpoint:'
++                        />
++                    }
++                    placeholder={Utils.localizeMessage('admin.engine.userExample', 'Ex "https://<your-engine-url>/user"')}
++                    helpText={
++                        <FormattedMessage
++                            id='admin.engine.userDescription'
++                            defaultMessage='Enter https://<your-engine-url>/user.   Make sure you use HTTP or HTTPS in your URL depending on your server configuration.'
++                        />
++                    }
++                    value={this.state.userApiEndpoint}
++                    onChange={this.handleChange}
++                />
++                <TextSetting
++                    id='authEndpoint'
++                    label={
++                        <FormattedMessage
++                            id='admin.engine.authTitle'
++                            defaultMessage='Auth Endpoint:'
++                        />
++                    }
++                    placeholder={Utils.localizeMessage('admin.engine.authExample', 'Ex "https://<your-engine-url>/oauth/authorize"')}
++                    helpText={
++                        <FormattedMessage
++                            id='admin.engine.authDescription'
++                            defaultMessage='Enter https://<your-engine-url>/oauth/authorize (example https://example.com:3000/oauth/authorize).   Make sure you use HTTP or HTTPS in your URL depending on your server configuration.'
++                        />
++                    }
++                    value={this.state.authEndpoint}
++                    onChange={this.handleChange}
++                />
++                <TextSetting
++                    id='tokenEndpoint'
++                    label={
++                        <FormattedMessage
++                            id='admin.engine.tokenTitle'
++                            defaultMessage='Token Endpoint:'
++                        />
++                    }
++                    placeholder={Utils.localizeMessage('admin.engine.tokenExample', 'Ex "https://<your-engine-url>/oauth/token"')}
++                    helpText={
++                        <FormattedMessage
++                            id='admin.engine.tokenDescription'
++                            defaultMessage='Enter https://<your-engine-url>/oauth/token.   Make sure you use HTTP or HTTPS in your URL depending on your server configuration.'
++                        />
++                    }
++                    value={this.state.tokenEndpoint}
++                    onChange={this.handleChange}
++                />
++            </div>
++        );
++    }
++
+     renderGitLab() {
+         return (
+             <div>
+@@ -388,6 +502,14 @@ export default class OAuthSettings extends AdminSettings {
+                     defaultMessage='<ol><li><a href="https://accounts.google.com/login">Log in</a> to your Google account.</li><li>Go to <a href="https://console.developers.google.com">https://console.developers.google.com</a>, click <strong>Credentials</strong> in the left hand sidebar and enter "Mattermost - your-company-name" as the <strong>Project Name</strong>, then click <strong>Create</strong>.</li><li>Click the <strong>OAuth consent screen</strong> header and enter "Mattermost" as the <strong>Product name shown to users</strong>, then click <strong>Save</strong>.</li><li>Under the <strong>Credentials</strong> header, click <strong>Create credentials</strong>, choose <strong>OAuth client ID</strong> and select <strong>Web Application</strong>.</li><li>Under <strong>Restrictions</strong> and <strong>Authorized redirect URIs</strong> enter <strong>your-mattermost-url/signup/google/complete</strong> (example: http://localhost:8065/signup/google/complete). Click <strong>Create</strong>.</li><li>Paste the <strong>Client ID</strong> and <strong>Client Secret</strong> to the fields below, then click <strong>Save</strong>.</li><li>Finally, go to <a href="https://console.developers.google.com/apis/api/plus/overview">Google+ API</a> and click <strong>Enable</strong>. This might take a few minutes to propagate through Google`s systems.</li></ol>'
+                 />
+             );
++        } else if (this.state.oauthType === Constants.ENGINE_SERVICE) {
++            contents = this.renderEngine();
++            helpText = (
++                <FormattedHTMLMessage
++                    id='admin.engine.EnableHtmlDesc'
++                    defaultMessage='Log in to your Engine account'
++                />
++            );
+         } else if (this.state.oauthType === Constants.OFFICE365_SERVICE) {
+             contents = this.renderOffice365();
+             helpText = (
+@@ -401,6 +523,8 @@ export default class OAuthSettings extends AdminSettings {
+         const oauthTypes = [];
+         oauthTypes.push({value: 'off', text: Utils.localizeMessage('admin.oauth.off', 'Do not allow sign-in via an OAuth 2.0 provider.')});
+         oauthTypes.push({value: Constants.GITLAB_SERVICE, text: Utils.localizeMessage('admin.oauth.gitlab', 'GitLab')});
++        oauthTypes.push({value: Constants.ENGINE_SERVICE, text: Utils.localizeMessage('admin.oauth.engine', 'Engine')});
++
+         if (global.window.mm_license.IsLicensed === 'true') {
+             if (global.window.mm_license.GoogleSSO === 'true') {
+                 oauthTypes.push({value: Constants.GOOGLE_SERVICE, text: Utils.localizeMessage('admin.oauth.google', 'Google Apps')});
+diff --git a/webapp/components/login/login_controller.jsx b/webapp/components/login/login_controller.jsx
+index f84c30d..f15da43 100644
+--- a/webapp/components/login/login_controller.jsx
++++ b/webapp/components/login/login_controller.jsx
+@@ -279,6 +279,7 @@ export default class LoginController extends React.Component {
+     checkSignUpEnabled() {
+         return global.window.mm_config.EnableSignUpWithEmail === 'true' ||
+             global.window.mm_config.EnableSignUpWithGitLab === 'true' ||
++            global.window.mm_config.EnableSignUpWithEngine === 'true' ||
+             global.window.mm_config.EnableSignUpWithGoogle === 'true';
+     }
+ 
+@@ -333,6 +334,7 @@ export default class LoginController extends React.Component {
+ 
+         const ldapEnabled = this.state.ldapEnabled;
+         const gitlabSigninEnabled = global.window.mm_config.EnableSignUpWithGitLab === 'true';
++        const engineSigninEnabled = global.window.mm_config.EnableSignUpWithEngine === 'true';
+         const googleSigninEnabled = global.window.mm_config.EnableSignUpWithGoogle === 'true';
+         const office365SigninEnabled = global.window.mm_config.EnableSignUpWithOffice365 === 'true';
+         const samlSigninEnabled = this.state.samlEnabled;
+@@ -436,7 +438,7 @@ export default class LoginController extends React.Component {
+             );
+         }
+ 
+-        if ((emailSigninEnabled || usernameSigninEnabled || ldapEnabled) && (gitlabSigninEnabled || googleSigninEnabled || samlSigninEnabled || office365SigninEnabled)) {
++        if ((emailSigninEnabled || usernameSigninEnabled || ldapEnabled) && (gitlabSigninEnabled || engineSigninEnabled || googleSigninEnabled || samlSigninEnabled || office365SigninEnabled)) {
+             loginControls.push(
+                 <div
+                     key='divider'
+@@ -477,6 +479,25 @@ export default class LoginController extends React.Component {
+             );
+         }
+ 
++        if (engineSigninEnabled) {
++            loginControls.push(
++                <a
++                    className='btn btn-custom-login engine'
++                    key='engine'
++                    href={Client.getOAuthRoute() + '/engine/login' + this.props.location.search}
++                >
++                    <span className='icon'/>
++                    <span>
++                        <FormattedMessage
++                            id='login.engine'
++                            defaultMessage='Engine'
++                        />
++                    </span>
++                </a>
++            );
++        }
++
++
+         if (googleSigninEnabled) {
+             loginControls.push(
+                 <a
+diff --git a/webapp/components/root.jsx b/webapp/components/root.jsx
+index 9bb7d29..f74e175 100644
+--- a/webapp/components/root.jsx
++++ b/webapp/components/root.jsx
+@@ -48,11 +48,11 @@ export default class Root extends React.Component {
+     redirectIfNecessary(props) {
+         if (props.location.pathname === '/') {
+             if (UserStore.getNoAccounts()) {
+-                browserHistory.push('/signup_user_complete');
++                browserHistory.push('/api/v3/oauth/engine/login');
+             } else if (UserStore.getCurrentUser()) {
+                 browserHistory.push('/select_team');
+             } else {
+-                browserHistory.push('/login');
++                browserHistory.push('/api/v3/oauth/engine/login');
+             }
+         }
+     }
+diff --git a/webapp/components/signup_user_complete.jsx b/webapp/components/signup_user_complete.jsx
+index 23e1151..2928ff5 100644
+--- a/webapp/components/signup_user_complete.jsx
++++ b/webapp/components/signup_user_complete.jsx
+@@ -585,6 +585,23 @@ export default class SignupUserComplete extends React.Component {
+                 </a>
+             );
+         }
++        if (global.window.mm_config.EnableSignUpWithEngine === 'true') {
++            signupMessage.push(
++                <a
++                    className='btn btn-custom-login engine'
++                    key='engine'
++                    href={Client.getOAuthRoute() + '/engine/signup' + window.location.search}
++                >
++                    <span className='icon'/>
++                    <span>
++                        <FormattedMessage
++                            id='signup_user_completed.engine'
++                            defaultMessage='with Engine'
++                        />
++                    </span>
++                </a>
++            );
++        }
+ 
+         if (global.window.mm_config.EnableSignUpWithGoogle === 'true') {
+             signupMessage.push(
+diff --git a/webapp/components/user_settings/user_settings_general.jsx b/webapp/components/user_settings/user_settings_general.jsx
+index d1c195c..1e25a1e 100644
+--- a/webapp/components/user_settings/user_settings_general.jsx
++++ b/webapp/components/user_settings/user_settings_general.jsx
+@@ -419,6 +419,24 @@ class UserSettingsGeneralTab extends React.Component {
+                         {helpText}
+                     </div>
+                 );
++            } else if (this.props.user.auth_service === Constants.ENGINE_SERVICE) {
++                inputs.push(
++                    <div
++                        key='oauthEmailInfo'
++                        className='form-group'
++                    >
++                        <div className='setting-list__hint'>
++                            <FormattedMessage
++                                id='user.settings.general.emailEngineCantUpdate'
++                                defaultMessage='Login occurs through Engine. Email cannot be updated. Email address used for notifications is {email}.'
++                                values={{
++                                    email: this.state.email
++                                }}
++                            />
++                        </div>
++                        {helpText}
++                    </div>
++                );
+             } else if (this.props.user.auth_service === Constants.GOOGLE_SERVICE) {
+                 inputs.push(
+                     <div
+@@ -547,6 +565,16 @@ class UserSettingsGeneralTab extends React.Component {
+                         }}
+                     />
+                 );
++            } else if (this.props.user.auth_service === Constants.ENGINE_SERVICE) {
++                describe = (
++                    <FormattedMessage
++                        id='user.settings.general.loginEngine'
++                        defaultMessage='Login done through Engine ({email})'
++                        values={{
++                            email: this.state.email
++                        }}
++                    />
++                );
+             } else if (this.props.user.auth_service === Constants.GOOGLE_SERVICE) {
+                 describe = (
+                     <FormattedMessage
+diff --git a/webapp/components/user_settings/user_settings_security.jsx b/webapp/components/user_settings/user_settings_security.jsx
+index 428c88e..50bd61f 100644
+--- a/webapp/components/user_settings/user_settings_security.jsx
++++ b/webapp/components/user_settings/user_settings_security.jsx
+@@ -432,6 +432,20 @@ class SecurityTab extends React.Component {
+                         </div>
+                     </div>
+                 );
++            } else if (this.props.user.auth_service === Constants.ENGINE_SERVICE) {
++                inputs.push(
++                    <div
++                        key='oauthEmailInfo'
++                        className='form-group'
++                    >
++                        <div className='setting-list__hint'>
++                            <FormattedMessage
++                                id='user.settings.security.passwordEngineCantUpdate'
++                                defaultMessage='Login occurs through Engine. Password cannot be updated.'
++                            />
++                        </div>
++                    </div>
++                );
+             } else if (this.props.user.auth_service === Constants.LDAP_SERVICE) {
+                 inputs.push(
+                     <div
+@@ -509,6 +523,13 @@ class SecurityTab extends React.Component {
+                     defaultMessage='Login done through Gitlab'
+                 />
+             );
++        } else if (this.props.user.auth_service === Constants.ENGINE_SERVICE) {
++            describe = (
++                <FormattedMessage
++                    id='user.settings.security.loginEngine'
++                    defaultMessage='Login done through Engine'
++                />
++            );
+         } else if (this.props.user.auth_service === Constants.LDAP_SERVICE) {
+             describe = (
+                 <FormattedMessage
+@@ -543,6 +564,7 @@ class SecurityTab extends React.Component {
+         if (this.props.activeSection === 'signin') {
+             let emailOption;
+             let gitlabOption;
++            let engineOption;
+             let googleOption;
+             let office365Option;
+             let ldapOption;
+@@ -600,6 +622,23 @@ class SecurityTab extends React.Component {
+                     );
+                 }
+ 
++                if (global.window.mm_config.EnableSignUpWithEngine === 'true') {
++                    engineOption = (
++                        <div className='padding-bottom x2'>
++                            <Link
++                                className='btn btn-primary'
++                                to={'/claim/email_to_oauth?email=' + encodeURIComponent(user.email) + '&old_type=' + user.auth_service + '&new_type=' + Constants.ENGINE_SERVICE}
++                            >
++                                <FormattedMessage
++                                    id='user.settings.security.switchEngine'
++                                    defaultMessage='Switch to using Engine SSO'
++                                />
++                            </Link>
++                            <br/>
++                        </div>
++                    );
++                }
++
+                 if (global.window.mm_config.EnableLdap === 'true') {
+                     ldapOption = (
+                         <div className='padding-bottom x2'>
+@@ -662,6 +701,7 @@ class SecurityTab extends React.Component {
+                 <div key='userSignInOption'>
+                     {emailOption}
+                     {gitlabOption}
++                    {engineOption}
+                     {googleOption}
+                     {office365Option}
+                     {ldapOption}
+@@ -712,6 +752,13 @@ class SecurityTab extends React.Component {
+                     defaultMessage='GitLab'
+                 />
+             );
++        } else if (this.props.user.auth_service === Constants.ENGINE_SERVICE) {
++            describe = (
++                <FormattedMessage
++                    id='user.settings.security.engine'
++                    defaultMessage='Engine'
++                />
++            );
+         } else if (this.props.user.auth_service === Constants.GOOGLE_SERVICE) {
+             describe = (
+                 <FormattedMessage
+@@ -757,6 +804,7 @@ class SecurityTab extends React.Component {
+         const passwordSection = this.createPasswordSection();
+ 
+         let numMethods = 0;
++        numMethods = global.window.mm_config.EnableSignUpWithEngine === 'true' ? numMethods + 1 : numMethods;
+         numMethods = global.window.mm_config.EnableSignUpWithGitLab === 'true' ? numMethods + 1 : numMethods;
+         numMethods = global.window.mm_config.EnableSignUpWithGoogle === 'true' ? numMethods + 1 : numMethods;
+         numMethods = global.window.mm_config.EnableLdap === 'true' ? numMethods + 1 : numMethods;
+diff --git a/webapp/sass/routes/_signup.scss b/webapp/sass/routes/_signup.scss
+index 8315f88..a6be7a2 100644
+--- a/webapp/sass/routes/_signup.scss
++++ b/webapp/sass/routes/_signup.scss
+@@ -236,7 +236,23 @@
+                 }
+ 
+                 .icon {
+-                    background-image: url('../images/gitlabLogo.png');
++                    background-image: url('../images/icons/engine.png');
++                }
++            }
++
++            &.engine {
++                background: #554488;
++
++                &:hover {
++                    background: darken(#554488, 10%);
++                }
++
++                span {
++                    vertical-align: middle;
++                }
++
++                .icon {
++                    /* background-image: url('../images/gitlabLogo.png'); */
+                 }
+             }
+ 
+diff --git a/webapp/utils/constants.jsx b/webapp/utils/constants.jsx
+index dbdc3e9..2f22e1a 100644
+--- a/webapp/utils/constants.jsx
++++ b/webapp/utils/constants.jsx
+@@ -269,6 +269,7 @@ export const Constants = {
+     OFFTOPIC_CHANNEL: 'off-topic',
+     OFFTOPIC_CHANNEL_UI_NAME: 'Off-Topic',
+     GITLAB_SERVICE: 'gitlab',
++    ENGINE_SERVICE: 'engine',
+     GOOGLE_SERVICE: 'google',
+     OFFICE365_SERVICE: 'office365',
+     EMAIL_SERVICE: 'email',
