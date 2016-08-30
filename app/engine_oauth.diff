@@ -644,12 +644,12 @@ index 9bb7d29..f74e175 100644
          if (props.location.pathname === '/') {
              if (UserStore.getNoAccounts()) {
 -                browserHistory.push('/signup_user_complete');
-+                browserHistory.push('/api/v3/oauth/engine/login');
++                window.location.href = '/api/v3/oauth/engine/login';
              } else if (UserStore.getCurrentUser()) {
                  browserHistory.push('/select_team');
              } else {
 -                browserHistory.push('/login');
-+                browserHistory.push('/api/v3/oauth/engine/login');
++                window.location.href = '/api/v3/oauth/engine/login';
              }
          }
      }
